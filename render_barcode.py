@@ -12,8 +12,8 @@ def generate_code39_no_checksum(payload: str, out_png: str = "code39_no_checksum
         "module_height": 40.0, # bar height
         "quiet_zone": 6.0,     # ~10 modules is ideal; adjust with module_width too
         "write_text": False,   # we'll draw digits separately if needed
-        "font_size": 0,        # suppress library text
-        "text_distance": 0,
+        "font_size": 24,       # suppress library text
+        "text_distance": 12,
         "dpi": 300,
         "background": "white",
         "foreground": "black",
@@ -26,4 +26,4 @@ def generate_code39_no_checksum(payload: str, out_png: str = "code39_no_checksum
 
 if __name__ == "__main__":
     permit_numeric = "6103268"  # what scanners read from the official permit
-    generate_code39_no_checksum(permit_numeric, "library_no_checksum.png")
+    generate_code39_no_checksum(permit_numeric, "permit_barcode_output.png")
