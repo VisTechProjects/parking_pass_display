@@ -1,24 +1,22 @@
-// demo_font.cpp
+// Parking Permit Display
 #include <Arduino.h>
 #include "heltec-eink-modules.h"
 
-// https://rop.nl/truetype2gfx/ extracts fonts to GFX format
-// Fonts in src/Fonts/ -- adjust names to match the files you have
 #include "Fonts/FreeSansBold8pt7b.h"
-#include "Fonts/Org_01.h"
-#include "Fonts/FreeSans12pt7b.h"
-#include "Fonts/FreeSansBold12pt7b.h"
 #include "Fonts/FreeSansBold13pt7b.h"
-#include "Fonts/FreeSansBold14pt7b.h"
 
 #include "Code39Generator.h"
 #include "imgs/toronto_logo.h"
 #include "permit_config.h"
+#include "wifi_helper.h"
 
 // Create display pointer locally (not extern)
 EInkDisplay_VisionMasterE290 *display = nullptr;
 
 const int LED_PIN = 45;
+
+// Global permit data
+PermitData currentPermit;
 
 void displayPermit(const char *permitNumber, const char *plateNumber,
                    const char *validFrom, const char *validTo,
@@ -102,15 +100,33 @@ void displayPermit(const char *permitNumber, const char *plateNumber,
   display->update();
 }
 
-void setup()
+void displayMessage(const char *message, int textSize = 1)
 {
-  Serial.begin(115200);
+  // Clear display memory
+  display->clearMemory();
 
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW);
+  // Set font
+  display->setFont(&FreeSansBold8pt7b);
+  display->setTextSize(textSize);
 
-  Serial.println("Attempting to create display instance...");
+  // Get text bounds to center the message
+  int16_t x1, y1;
+  uint16_t w, h;
+  display->getTextBounds((char *)message, 0, 0, &x1, &y1, &w, &h);
 
+  // Center the text on screen
+  int x = (SCREEN_W - w) / 2;
+  int y = (SCREEN_H + h) / 2;
+
+  display->setCursor(x, y);
+  display->print(message);
+
+  // Push to e-ink
+  display->update();
+}
+
+bool displayInit()
+{
   if (!display)
   {
     display = new EInkDisplay_VisionMasterE290();
@@ -119,23 +135,199 @@ void setup()
     {
       Serial.println("Library constructor failed, trying explicit fallback...");
       display = new DEPG0290BNS800(4, 3, 6);
+      return false;
     }
   }
 
-  Serial.println("Display instance created.");
-
   display->landscape();
-  display->clearMemory();
+  return true;
+}
 
-  Serial.println("Displaying permit...");
+void checkForUpdate(bool forceUpdate = false)
+{
+  Serial.println("\n=== Manual Update Triggered ===");
+  if (forceUpdate) {
+    Serial.println("FORCE UPDATE - Will download regardless of permit number");
+    displayMessage("Force update...", 1);
+  } else {
+    displayMessage("Checking for\nupdate...", 1);
+  }
+  
+  if (connectToWiFi()) {
+    displayMessage("Downloading...", 1);
+    
+    PermitData newPermit;
+    int result;
+    
+    if (forceUpdate) {
+      // Force update - download without checking permit number
+      result = downloadPermitData(&newPermit, "");  // Empty string forces download
+    } else {
+      result = downloadPermitData(&newPermit, currentPermit.permitNumber);
+    }
+    
+    if (result == 1 || (result == 2 && forceUpdate)) {
+      // Updated (or force update even if same)
+      Serial.println("Permit downloaded!");
+      displayMessage("Updated!", 2);
+      delay(1000);
+      
+      // Update current permit and display
+      currentPermit = newPermit;
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+                    currentPermit.validFrom, currentPermit.validTo,
+                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    } else if (result == 2) {
+      // Already up to date
+      Serial.println("Already up to date!");
+      displayMessage("Already up\nto date", 1);
+      delay(2000);
+      
+      // Redisplay current permit
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+                    currentPermit.validFrom, currentPermit.validTo,
+                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    } else {
+      // Error
+      Serial.println("Update failed!");
+      displayMessage("Update failed", 1);
+      delay(2000);
+      
+      // Redisplay current permit
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+                    currentPermit.validFrom, currentPermit.validTo,
+                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    }
+    
+    disconnectWiFi();
+  } else {
+    Serial.println("WiFi not available!");
+    displayMessage("No WiFi", 1);
+    delay(2000);
+    
+    // Redisplay current permit
+    displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+                  currentPermit.validFrom, currentPermit.validTo,
+                  currentPermit.barcodeValue, currentPermit.barcodeLabel);
+  }
+}
 
-  // Call displayPermit with the data from config file
-  displayPermit(PERMIT_NUMBER, PLATE_NUMBER, VALID_FROM, VALID_TO, BARCODE_VALUE, BARCODE_LABEL);
+void setup()
+{
+  Serial.begin(115200);
 
-  Serial.println("Permit displayed.");
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, LOW);
+  
+  // Setup button with internal pullup
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+
+  Serial.println("Attempting to create display instance...");
+
+  if (!displayInit())
+  {
+    Serial.println("Display initialization failed!");
+    while (1);
+  }
+  else
+  {
+    Serial.println("Display instance created.");
+  }
+  
+  // Try to load saved permit data first
+  bool hasSavedData = loadPermitData(&currentPermit);
+  
+  // Note: Don't display yet - e-ink retains image when powered off
+  // We'll only update display if data changes or if this is first boot
+  
+  if (!hasSavedData) {
+    // No saved data, show message
+    displayMessage("No permit data", 1);
+    Serial.println("No saved permit data available.");
+    strcpy(currentPermit.permitNumber, "");  // Empty permit number
+  } else {
+    Serial.println("Saved permit data loaded. Display should already show this data.");
+  }
+
+  // Try to connect to WiFi and update
+  if (!hasSavedData) {
+    displayMessage("Checking WiFi...", 1);
+  }
+  
+  if (connectToWiFi()) {
+    if (!hasSavedData) {
+      displayMessage("Updating...", 1);
+    }
+    
+    PermitData newPermit;
+    int result = downloadPermitData(&newPermit, currentPermit.permitNumber);
+    
+    if (result == 1) {
+      Serial.println("Successfully downloaded new permit data!");
+      currentPermit = newPermit;
+      
+      // Display the updated permit
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+                    currentPermit.validFrom, currentPermit.validTo,
+                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    } else if (result == 2) {
+      Serial.println("Permit is already current.");
+      // Permit already displayed, no action needed
+    } else {
+      Serial.println("Failed to download permit data. Using saved data.");
+      // If no saved data, show error
+      if (!hasSavedData) {
+        displayMessage("Update failed", 1);
+      }
+    }
+    
+    // Disconnect WiFi to save power
+    disconnectWiFi();
+  } else {
+    Serial.println("WiFi not available. Using saved data.");
+    // If no saved data, show error
+    if (!hasSavedData) {
+      displayMessage("No WiFi", 1);
+    }
+  }
+
+  Serial.println("Setup complete. Press button to check for updates.");
 }
 
 void loop()
 {
-  // nothing - demo ran in setup
+  // Check if button is pressed (LOW = pressed due to pullup)
+  if (digitalRead(BUTTON_PIN) == LOW) {
+    delay(50);  // Debounce
+    if (digitalRead(BUTTON_PIN) == LOW) {
+      // Button is pressed - measure how long
+      unsigned long pressStart = millis();
+      bool longPressTriggered = false;
+      
+      // Wait for button release or 3 second timeout
+      while (digitalRead(BUTTON_PIN) == LOW) {
+        if (!longPressTriggered && (millis() - pressStart) >= 3000) {
+          // Long press threshold reached - trigger immediately
+          Serial.println("Long press detected - Force update!");
+          longPressTriggered = true;
+          checkForUpdate(true);  // Force update
+          break;  // Exit loop
+        }
+        delay(10);
+      }
+      
+      // Wait for button release
+      while (digitalRead(BUTTON_PIN) == LOW) {
+        delay(10);
+      }
+      
+      // If it was a short press (long press wasn't triggered)
+      if (!longPressTriggered) {
+        Serial.println("Short press detected - Normal update check");
+        checkForUpdate(false);  // Normal update
+      }
+    }
+  }
+  
+  delay(100);  // Small delay to reduce CPU usage
 }
