@@ -7,111 +7,98 @@
 #include "Fonts/FreeSansBold8pt7b.h"
 #include "Fonts/Org_01.h"
 #include "Fonts/FreeSans12pt7b.h"
+#include "Fonts/FreeSansBold12pt7b.h"
+#include "Fonts/FreeSansBold13pt7b.h"
+#include "Fonts/FreeSansBold14pt7b.h"
 
 #include "Code39Generator.h"
+#include "imgs/toronto_logo.h"
+#include "permit_config.h"
 
 // Create display pointer locally (not extern)
 EInkDisplay_VisionMasterE290 *display = nullptr;
 
 const int LED_PIN = 45;
 
-// demo strings (compact)
-const char *valid_from = "Sep 05, 2025: 01:08";
-const char *valid_to = "Sep 12, 2025: 01:08";
-
-const int SCREEN_W = 296;
-const int SCREEN_H = 128;
-
-void showFontDemo(const GFXfont *font, uint8_t textSize, const char *fontName)
+void displayPermit(const char *permitNumber, const char *plateNumber,
+                   const char *validFrom, const char *validTo,
+                   const char *barcodeValue, const char *barcodeLabel)
 {
   // clear display memory / framebuffer
   display->clearMemory();
 
   // choose font/size
-  display->setFont((GFXfont *)font);
-  display->setTextSize(textSize);
+  display->setFont((GFXfont *)&FreeSansBold8pt7b);
+  display->setTextSize(1);
 
-  // Measure both lines
-  int16_t bx, by;
-  uint16_t w1, h1, w2, h2;
-  display->getTextBounds((char *)valid_from, 0, 0, &bx, &by, &w1, &h1);
-  display->getTextBounds((char *)valid_to, 0, 0, &bx, &by, &w2, &h2);
+  // ========== CALCULATE TEXT POSITIONS ==========
+  const int PLATE_X = PERMIT_X;
+  const int PLATE_Y = PERMIT_Y + PLATE_Y_OFFSET;
 
-  Serial.print(" valid_from -> w=");
-  Serial.print(w1);
-  Serial.print(" h=");
-  Serial.println(h1);
-  Serial.print(" valid_to   -> w=");
-  Serial.print(w2);
-  Serial.print(" h=");
-  Serial.println(h2);
+  const int VALID_FROM_X = PERMIT_X;
+  const int VALID_FROM_Y = PLATE_Y + VALID_FROM_Y_OFFSET;
 
+  const int VALID_TO_X = PERMIT_X;
+  const int VALID_TO_Y = VALID_FROM_Y + VALID_TO_Y_OFFSET;
 
-  
+  // Build permit strings
+  char permit_no[30];
+  char plate_no[30];
+  sprintf(permit_no, "Permit #: %s", permitNumber);
+  sprintf(plate_no, "Plate #: %s", plateNumber);
 
-// ========== EASILY ADJUSTABLE TEXT POSITIONS ==========
-const int VALID_FROM_X = 150;              // X position for "Valid from"
-const int VALID_FROM_Y = 12;               // Y position (baseline) for "Valid from"
+  display->setCursor(PERMIT_X, PERMIT_Y);
+  display->print(permit_no);
 
-const int VALID_TO_X = VALID_FROM_X;       // X position for "Valid to"
-const int VALID_TO_Y = VALID_FROM_Y + 15;  // Y position (baseline) for "Valid to"
+  display->setCursor(PLATE_X, PLATE_Y);
+  display->print(plate_no);
 
-const int PERMIT_X = VALID_FROM_X;         // X position for "Permit #"
-const int PERMIT_Y = VALID_TO_Y + 20;      // Y position (baseline) for "Permit #" (extra space)
+  // Draw horizontal line separator between permit/plate and dates
+  int lineY = PLATE_Y + HORIZONTAL_LINE_Y_OFFSET;
+  display->drawLine(PERMIT_X, lineY, SCREEN_W - 5, lineY, 0x0000);
 
-const int PLATE_X = VALID_FROM_X;          // X position for "Plate #"
-const int PLATE_Y = PERMIT_Y + 15;         // Y position (baseline) for "Plate #"
-// ======================================================
+  display->setCursor(VALID_FROM_X, VALID_FROM_Y);
+  display->print(validFrom);
 
-// Permit data
-const char *permit_no = "Permit #: T6103268";
-const char *plate_no = "Plate #: CSEB187";
+  display->setCursor(VALID_TO_X, VALID_TO_Y);
+  display->print(validTo);
 
-// Draw the lines using chosen font
-display->setFont((GFXfont *)font);
-display->setTextSize(textSize);
-
-display->setCursor(VALID_FROM_X, VALID_FROM_Y);
-display->print(valid_from);
-
-display->setCursor(VALID_TO_X, VALID_TO_Y);
-display->print(valid_to);
-
-display->setCursor(PERMIT_X, PERMIT_Y);
-display->print(permit_no);
-
-display->setCursor(PLATE_X, PLATE_Y);
-display->print(plate_no);
-
-
-
-
-
-  // ========== BARCODE SETTINGS ==========
-  const char *barcodeValue = "6103268"; // value encoded into the barcode
-  const char *barcodeLabel = "00435";   // human-visible label shown under barcode
-  int barcodeX = 0;
-  int barcodeY = 0;
-  int barcodeHeight = 45;
-  int narrowBarWidth = 1; // Adjust this for different barcode sizes
-  // ======================================
-
+  // ========== DRAW BARCODE ==========
   Code39Generator barcodeGen(display);
+  barcodeGen.drawBarcode(barcodeValue, BARCODE_X, BARCODE_Y, BARCODE_HEIGHT, NARROW_BAR_WIDTH);
 
-  // Draw the barcode (encodes barcodeValue)
-  barcodeGen.drawBarcode(barcodeValue, barcodeX, barcodeY, barcodeHeight, narrowBarWidth);
-
-  // Draw the human-readable label below the barcode (shows barcodeLabel) and center it
-  int barcodePixelWidth = barcodeGen.getBarcodeWidth(barcodeValue, narrowBarWidth);
+  // Draw the human-readable label below the barcode (centered)
+  int barcodePixelWidth = barcodeGen.getBarcodeWidth(barcodeValue, NARROW_BAR_WIDTH);
   int16_t x3, y3;
   uint16_t w, h;
-  display->setFont(&FreeSans12pt7b);
+  display->setFont(&FreeSansBold13pt7b);
   display->getTextBounds(barcodeLabel, 0, 0, &x3, &y3, &w, &h);
-  int labelX = barcodeX + (barcodePixelWidth / 2) - (w / 2);
-  display->setCursor(labelX, barcodeY + barcodeHeight + 25);
+  int labelX = BARCODE_X + (barcodePixelWidth / 2) - (w / 2);
+  display->setCursor(labelX, BARCODE_Y + BARCODE_HEIGHT + BARCODE_LABEL_Y_OFFSET);
   display->print(barcodeLabel);
 
-  // push to e-ink
+  // ========== DRAW LOGO ==========
+  int logoX = BARCODE_X + (barcodePixelWidth / 2) - (LOGO_WIDTH / 2);
+  int logoY = BARCODE_Y + BARCODE_HEIGHT + LOGO_Y_OFFSET;
+
+  // Invert image (white logo on black background)
+  display->fillRect(logoX, logoY, LOGO_WIDTH, LOGO_HEIGHT, 0x0000);
+  display->drawBitmap(logoX, logoY, logo_toronto, LOGO_WIDTH, LOGO_HEIGHT, 0xFFFF);
+
+  // ========== DRAW TEMPORARY PARKING TEXT ==========
+  const char *permitText1 = "Temporary parking";
+  const char *permitText2 = "permit";
+  int permitTextX = logoX + LOGO_WIDTH + TEMP_PARKING_X_OFFSET;
+  int permitTextY1 = logoY + TEMP_PARKING_Y1_OFFSET;
+  int permitTextY2 = permitTextY1 + TEMP_PARKING_Y2_OFFSET;
+  display->setFont(&FreeSansBold8pt7b);
+  display->setTextSize(1);
+  display->setCursor(permitTextX, permitTextY1);
+  display->print(permitText1);
+  display->setCursor(permitTextX, permitTextY2);
+  display->print(permitText2);
+
+  // Push to e-ink
   display->update();
 }
 
@@ -140,12 +127,12 @@ void setup()
   display->landscape();
   display->clearMemory();
 
-  Serial.println("Font demo starting...");
+  Serial.println("Displaying permit...");
 
-  // Try the font
-  showFontDemo(&FreeSansBold8pt7b, 1, "FreeSansBold8pt7b size=1");
+  // Call displayPermit with the data from config file
+  displayPermit(PERMIT_NUMBER, PLATE_NUMBER, VALID_FROM, VALID_TO, BARCODE_VALUE, BARCODE_LABEL);
 
-  Serial.println("Font demo finished.");
+  Serial.println("Permit displayed.");
 }
 
 void loop()
