@@ -1,8 +1,8 @@
 {
-    "permitNumber": "T6146330",
-    "plateNumber": "CSEB187",
-    "validFrom": "Oct 25, 2025 at 12:00 AM",
-    "validTo": "Nov 01, 2025 at 11:59 PM",
-    "barcodeValue": "6146330",
-    "barcodeLabel": "00435"
+  "permitNumber": "T6146330",
+  "plateNumber": "CSEB187",
+  "validFrom": "Oct 25, 2025: 12:00",
+  "validTo": "Nov 01, 2025: 11:59",
+  "barcodeValue": "6146330",
+  "barcodeLabel": "00435"
 }
