@@ -7,6 +7,13 @@
 #include <Preferences.h>
 #include "wifi_config.h"
 
+// ANSI color codes for serial output (only reliable colors)
+#define COLOR_RESET   "\033[0m"
+#define COLOR_RED     "\033[31m"
+#define COLOR_GREEN   "\033[32m"
+#define COLOR_YELLOW  "\033[33m"
+#define COLOR_MAGENTA "\033[35m"
+
 Preferences preferences;
 
 struct PermitData {
@@ -17,6 +24,13 @@ struct PermitData {
   char barcodeValue[20];
   char barcodeLabel[20];
 };
+
+// Helper function to safely copy JSON string to char array
+void safeJsonCopy(char* dest, size_t destSize, JsonDocument& doc, const char* key) {
+  const char* value = doc[key] | "";
+  strncpy(dest, value, destSize - 1);
+  dest[destSize - 1] = '\0';
+}
 
 // Load permit data from flash memory
 bool loadPermitData(PermitData* data) {
@@ -33,13 +47,19 @@ bool loadPermitData(PermitData* data) {
     preferences.getString("barcodeLabel", data->barcodeLabel, sizeof(data->barcodeLabel));
     
     preferences.end();
+    Serial.print(COLOR_GREEN);
     Serial.print("Loaded permit data from flash. Permit #: ");
-    Serial.println(data->permitNumber);
+    Serial.print(data->permitNumber);
+    Serial.print(COLOR_RESET);
+    Serial.println();
     return true;
   }
   
   preferences.end();
-  Serial.println("No saved permit data found in flash.");
+  Serial.print(COLOR_YELLOW);
+  Serial.print("No saved permit data found in flash.");
+  Serial.print(COLOR_RESET);
+  Serial.println();
   return false;
 }
 
@@ -55,8 +75,11 @@ void savePermitData(PermitData* data) {
   preferences.putString("barcodeLabel", data->barcodeLabel);
   
   preferences.end();
+  Serial.print(COLOR_GREEN);
   Serial.print("Saved permit data to flash. Permit #: ");
-  Serial.println(data->permitNumber);
+  Serial.print(data->permitNumber);
+  Serial.print(COLOR_RESET);
+  Serial.println();
 }
 
 bool tryConnectToWiFi(const char* ssid, const char* password) {
@@ -78,13 +101,21 @@ bool tryConnectToWiFi(const char* ssid, const char* password) {
   }
   
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nConnected to WiFi!");
-    Serial.print("IP: ");
+    Serial.println();
+    Serial.print(COLOR_GREEN);
+    Serial.print("Connected to WiFi!");
+    Serial.print(COLOR_RESET);
+    Serial.println();
+    Serial.print("  IP: ");
     Serial.println(WiFi.localIP());
     return true;
   }
   
-  Serial.println("\nFailed.");
+  Serial.println();
+  Serial.print(COLOR_RED);
+  Serial.print("Failed.");
+  Serial.print(COLOR_RESET);
+  Serial.println();
   return false;
 }
 
@@ -108,14 +139,20 @@ bool connectToWiFi() {
     return true;
   }
   
-  Serial.println("Failed to connect to any WiFi network.");
+  Serial.print(COLOR_RED);
+  Serial.print("Failed to connect to any WiFi network.");
+  Serial.print(COLOR_RESET);
+  Serial.println();
   return false;
 }
 
 // Returns: 0 = error, 1 = updated, 2 = already up to date
 int downloadPermitData(PermitData* data, const char* currentPermitNumber) {
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Not connected to WiFi!");
+    Serial.print(COLOR_RED);
+    Serial.print("Not connected to WiFi!");
+    Serial.print(COLOR_RESET);
+    Serial.println();
     return 0;
   }
   
@@ -132,50 +169,99 @@ int downloadPermitData(PermitData* data, const char* currentPermitNumber) {
     Serial.println("Download successful!");
     
     // Parse JSON
+    // Use a JsonDocument with enough capacity for the expected JSON payload.
+    // Increase size if your JSON grows.
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, payload);
     
     if (error) {
+      Serial.print(COLOR_RED);
       Serial.print("JSON parsing failed: ");
-      Serial.println(error.c_str());
+      Serial.print(error.c_str());
+      Serial.print(COLOR_RESET);
+      Serial.println();
       http.end();
       return 0;
     }
     
-    // Check permit number first
-    const char* newPermitNumber = doc[JSON_PERMIT_NUMBER] | "T6103268";
+    Serial.println("Permit data raw:");
+    
+    Serial.print(payload);
+    
+    Serial.println();
+    
+    // Validate that required field exists and is a string
+    if (!doc[JSON_PERMIT_NUMBER].is<const char*>()) {
+      Serial.print(COLOR_RED);
+      Serial.print("JSON missing required field: permit number");
+      Serial.print(COLOR_RESET);
+      Serial.println();
+      http.end();
+      return 0;
+    }
+    
+    const char* newPermitNumber = doc[JSON_PERMIT_NUMBER];
+    
+    // Check if permit number is empty
+    if (strlen(newPermitNumber) == 0) {
+      Serial.print(COLOR_RED);
+      Serial.print("Permit number is empty in JSON response");
+      Serial.print(COLOR_RESET);
+      Serial.println();
+      http.end();
+      return 0;
+    }
+    
+    Serial.print(COLOR_MAGENTA);
     Serial.print("Server permit #: ");
-    Serial.println(newPermitNumber);
+    Serial.print(newPermitNumber);
+    Serial.print(COLOR_RESET);
+    Serial.println();
+    Serial.print(COLOR_MAGENTA);
     Serial.print("Current permit #: ");
-    Serial.println(currentPermitNumber);
+    Serial.print(currentPermitNumber);
+    Serial.print(COLOR_RESET);
+    Serial.println();
     
     // Compare permit numbers
     if (strcmp(newPermitNumber, currentPermitNumber) == 0) {
-      Serial.println("Permit number matches. No changes needed.");
+      Serial.print(COLOR_YELLOW);
+      Serial.print("Permit number matches. No changes needed.");
+      Serial.print(COLOR_RESET);
+      Serial.println();
       http.end();
       return 2;  // Already up to date
     }
     
-    Serial.println("New permit detected! Updating...");
+    Serial.print(COLOR_GREEN);
+    Serial.print("New permit detected! Updating...");
+    Serial.print(COLOR_RESET);
+    Serial.println();
     
-    // Extract data from JSON
-    strncpy(data->permitNumber, newPermitNumber, sizeof(data->permitNumber) - 1);
-    strncpy(data->plateNumber, doc[JSON_PLATE_NUMBER] | "CSEB187", sizeof(data->plateNumber) - 1);
-    strncpy(data->validFrom, doc[JSON_VALID_FROM] | "Sep 05, 2025: 01:08", sizeof(data->validFrom) - 1);
-    strncpy(data->validTo, doc[JSON_VALID_TO] | "Sep 12, 2025: 01:08", sizeof(data->validTo) - 1);
-    strncpy(data->barcodeValue, doc[JSON_BARCODE_VALUE] | "6103268", sizeof(data->barcodeValue) - 1);
-    strncpy(data->barcodeLabel, doc[JSON_BARCODE_LABEL] | "00435", sizeof(data->barcodeLabel) - 1);
+    // Extract data from JSON using helper function
+    safeJsonCopy(data->permitNumber, sizeof(data->permitNumber), doc, JSON_PERMIT_NUMBER);
+    safeJsonCopy(data->plateNumber, sizeof(data->plateNumber), doc, JSON_PLATE_NUMBER);
+    safeJsonCopy(data->validFrom, sizeof(data->validFrom), doc, JSON_VALID_FROM);
+    safeJsonCopy(data->validTo, sizeof(data->validTo), doc, JSON_VALID_TO);
+    safeJsonCopy(data->barcodeValue, sizeof(data->barcodeValue), doc, JSON_BARCODE_VALUE);
+    safeJsonCopy(data->barcodeLabel, sizeof(data->barcodeLabel), doc, JSON_BARCODE_LABEL);
     
     http.end();
-    Serial.println("Permit data parsed successfully!");
+    Serial.print(COLOR_GREEN);
+    Serial.print("Permit data parsed successfully!");
+    Serial.print(COLOR_RESET);
+    Serial.println();
     
     // Save to flash memory
     savePermitData(data);
     
     return 1;  // Updated
   } else {
+    Serial.print(COLOR_RED);
     Serial.print("HTTP request failed with code: ");
-    Serial.println(httpCode);
+    Serial.print(httpCode);
+    Serial.print(COLOR_RESET);
+    Serial.println();
     http.end();
     return 0;  // Error
   }

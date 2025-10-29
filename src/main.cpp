@@ -27,7 +27,7 @@ void displayPermit(const char *permitNumber, const char *plateNumber,
 
   // choose font/size
   display->setFont((GFXfont *)&FreeSansBold8pt7b);
-  display->setTextSize(1);
+  display->setTextSize(1); 
 
   // ========== CALCULATE TEXT POSITIONS ==========
   const int PLATE_X = PERMIT_X;
@@ -146,67 +146,81 @@ bool displayInit()
 void checkForUpdate(bool forceUpdate = false)
 {
   Serial.println("\n=== Manual Update Triggered ===");
-  if (forceUpdate) {
+  if (forceUpdate)
+  {
     Serial.println("FORCE UPDATE - Will download regardless of permit number");
     displayMessage("Force update...", 1);
-  } else {
+  }
+  else
+  {
     displayMessage("Checking for\nupdate...", 1);
   }
-  
-  if (connectToWiFi()) {
+
+  if (connectToWiFi())
+  {
     displayMessage("Downloading...", 1);
-    
+
     PermitData newPermit;
     int result;
-    
-    if (forceUpdate) {
+
+    if (forceUpdate)
+    {
       // Force update - download without checking permit number
-      result = downloadPermitData(&newPermit, "");  // Empty string forces download
-    } else {
+      result = downloadPermitData(&newPermit, ""); // Empty string forces download
+    }
+    else
+    {
       result = downloadPermitData(&newPermit, currentPermit.permitNumber);
     }
-    
-    if (result == 1 || (result == 2 && forceUpdate)) {
+
+    if (result == 1 || (result == 2 && forceUpdate))
+    {
       // Updated (or force update even if same)
       Serial.println("Permit downloaded!");
       displayMessage("Updated!", 2);
       delay(1000);
-      
+
       // Update current permit and display
       currentPermit = newPermit;
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
                     currentPermit.validFrom, currentPermit.validTo,
                     currentPermit.barcodeValue, currentPermit.barcodeLabel);
-    } else if (result == 2) {
+    }
+    else if (result == 2)
+    {
       // Already up to date
       Serial.println("Already up to date!");
       displayMessage("Already up\nto date", 1);
       delay(2000);
-      
+
       // Redisplay current permit
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
                     currentPermit.validFrom, currentPermit.validTo,
                     currentPermit.barcodeValue, currentPermit.barcodeLabel);
-    } else {
+    }
+    else
+    {
       // Error
       Serial.println("Update failed!");
       displayMessage("Update failed", 1);
       delay(2000);
-      
+
       // Redisplay current permit
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
                     currentPermit.validFrom, currentPermit.validTo,
                     currentPermit.barcodeValue, currentPermit.barcodeLabel);
     }
-    
+
     disconnectWiFi();
-  } else {
+  }
+  else
+  {
     Serial.println("WiFi not available!");
     displayMessage("No WiFi", 1);
     delay(2000);
-    
+
     // Redisplay current permit
-    displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+    displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
                   currentPermit.validFrom, currentPermit.validTo,
                   currentPermit.barcodeValue, currentPermit.barcodeLabel);
   }
@@ -218,7 +232,7 @@ void setup()
 
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  
+
   // Setup button with internal pullup
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
@@ -227,66 +241,82 @@ void setup()
   if (!displayInit())
   {
     Serial.println("Display initialization failed!");
-    while (1);
+    while (1)
+      ;
   }
   else
   {
     Serial.println("Display instance created.");
   }
-  
+
   // Try to load saved permit data first
   bool hasSavedData = loadPermitData(&currentPermit);
-  
+
   // Note: Don't display yet - e-ink retains image when powered off
   // We'll only update display if data changes or if this is first boot
-  
-  if (!hasSavedData) {
+
+  if (!hasSavedData)
+  {
     // No saved data, show message
     displayMessage("No permit data", 1);
     Serial.println("No saved permit data available.");
-    strcpy(currentPermit.permitNumber, "");  // Empty permit number
-  } else {
+    strcpy(currentPermit.permitNumber, ""); // Empty permit number
+  }
+  else
+  {
     Serial.println("Saved permit data loaded. Display should already show this data.");
   }
 
   // Try to connect to WiFi and update
-  if (!hasSavedData) {
+  if (!hasSavedData)
+  {
     displayMessage("Checking WiFi...", 1);
   }
-  
-  if (connectToWiFi()) {
-    if (!hasSavedData) {
+
+  if (connectToWiFi())
+  {
+    if (!hasSavedData)
+    {
       displayMessage("Updating...", 1);
     }
-    
+
     PermitData newPermit;
     int result = downloadPermitData(&newPermit, currentPermit.permitNumber);
-    
-    if (result == 1) {
+
+    if (result == 1)
+    {
       Serial.println("Successfully downloaded new permit data!");
       currentPermit = newPermit;
-      
+
       // Display the updated permit
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber, 
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
                     currentPermit.validFrom, currentPermit.validTo,
                     currentPermit.barcodeValue, currentPermit.barcodeLabel);
-    } else if (result == 2) {
+    }
+    else if (result == 2)
+    {
       Serial.println("Permit is already current.");
       // Permit already displayed, no action needed
-    } else {
+    }
+    else
+    {
       Serial.println("Failed to download permit data. Using saved data.");
       // If no saved data, show error
-      if (!hasSavedData) {
+      if (!hasSavedData)
+      {
         displayMessage("Update failed", 1);
       }
     }
-    
+
     // Disconnect WiFi to save power
     disconnectWiFi();
-  } else {
+  }
+  else
+  {
     Serial.println("WiFi not available. Using saved data.");
     // If no saved data, show error
-    if (!hasSavedData) {
+    if (!hasSavedData)
+    {
       displayMessage("No WiFi", 1);
     }
   }
@@ -297,37 +327,43 @@ void setup()
 void loop()
 {
   // Check if button is pressed (LOW = pressed due to pullup)
-  if (digitalRead(BUTTON_PIN) == LOW) {
-    delay(50);  // Debounce
-    if (digitalRead(BUTTON_PIN) == LOW) {
+  if (digitalRead(BUTTON_PIN) == LOW)
+  {
+    delay(50); // Debounce
+    if (digitalRead(BUTTON_PIN) == LOW)
+    {
       // Button is pressed - measure how long
       unsigned long pressStart = millis();
       bool longPressTriggered = false;
-      
+
       // Wait for button release or 3 second timeout
-      while (digitalRead(BUTTON_PIN) == LOW) {
-        if (!longPressTriggered && (millis() - pressStart) >= 3000) {
+      while (digitalRead(BUTTON_PIN) == LOW)
+      {
+        if (!longPressTriggered && (millis() - pressStart) >= 3000)
+        {
           // Long press threshold reached - trigger immediately
           Serial.println("Long press detected - Force update!");
           longPressTriggered = true;
-          checkForUpdate(true);  // Force update
-          break;  // Exit loop
+          checkForUpdate(true); // Force update
+          break;                // Exit loop
         }
         delay(10);
       }
-      
+
       // Wait for button release
-      while (digitalRead(BUTTON_PIN) == LOW) {
+      while (digitalRead(BUTTON_PIN) == LOW)
+      {
         delay(10);
       }
-      
+
       // If it was a short press (long press wasn't triggered)
-      if (!longPressTriggered) {
+      if (!longPressTriggered)
+      {
         Serial.println("Short press detected - Normal update check");
-        checkForUpdate(false);  // Normal update
+        checkForUpdate(false); // Normal update
       }
     }
   }
-  
-  delay(100);  // Small delay to reduce CPU usage
+
+  delay(100); // Small delay to reduce CPU usage
 }
