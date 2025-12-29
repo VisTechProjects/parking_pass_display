@@ -63,16 +63,6 @@ Use force update when you:
 - Changed permit details (dates, plate) but kept same permit number
 - Need to bypass GitHub's CDN cache (updates immediately, no 5-10 min wait)
 
-## Update Permit (Python)
-
-```bash
-pip install pdfplumber PyPDF2 requests
-export GITHUB_TOKEN="your_token"
-python parse_parking_permit.py
-```
-
-Parses PDF and pushes to GitHub automatically.
-
 ## Files
 
 - `main.cpp` - Main code
@@ -80,7 +70,6 @@ Parses PDF and pushes to GitHub automatically.
 - `wifi_config.h` - WiFi settings
 - `permit_config.h` - Display layout
 - `Code39Generator.h` - Barcode
-- `parse_parking_permit.py` - PDF parser
 
 ## Notes
 
