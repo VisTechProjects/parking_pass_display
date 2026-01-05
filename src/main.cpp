@@ -9,6 +9,7 @@
 #include "imgs/toronto_logo.h"
 #include "permit_config.h"
 #include "wifi_helper.h"
+#include "bluetooth_helper.h"
 
 // Create display pointer locally (not extern)
 EInkDisplay_VisionMasterE290 *display = nullptr;
