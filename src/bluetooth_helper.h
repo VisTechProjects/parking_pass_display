@@ -172,7 +172,8 @@ int downloadPermitViaBluetooth(PermitData *data, const char *currentPermitNumber
     }
 
     // Read the permit JSON
-    String permitJson = permitChar->readValue();
+    std::string permitJsonStd = permitChar->readValue();
+    String permitJson = permitJsonStd.c_str();
 
     Serial.println("Received permit data:");
     Serial.println(permitJson.c_str());
