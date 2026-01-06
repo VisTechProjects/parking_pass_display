@@ -10,6 +10,12 @@
 // Must match Android app UUIDs
 #define BLE_SERVICE_UUID "12345678-1234-5678-1234-56789abcdef0"
 #define BLE_PERMIT_CHAR_UUID "12345678-1234-5678-1234-56789abcdef1"
+#define BLE_STATUS_CHAR_UUID "12345678-1234-5678-1234-56789abcdef2"
+
+// Status messages to send to phone
+#define ESP_MSG_SYNC_COMPLETE "SYNC_OK"
+#define ESP_MSG_DISPLAY_UPDATED "UPDATED"
+#define ESP_MSG_BUTTON_PRESS "BUTTON"
 
 // Scan settings
 #define BLE_SCAN_TIME 5        // seconds to scan for phone
@@ -170,6 +176,14 @@ int downloadPermitViaBluetooth(PermitData *data, const char *currentPermitNumber
 
     Serial.println("Received permit data:");
     Serial.println(permitJson.c_str());
+
+    // Try to get status characteristic and send SYNC_OK
+    BLERemoteCharacteristic *statusChar = service->getCharacteristic(BLEUUID(BLE_STATUS_CHAR_UUID));
+    if (statusChar && statusChar->canWrite())
+    {
+        Serial.println("Sending SYNC_OK to phone...");
+        statusChar->writeValue(ESP_MSG_SYNC_COMPLETE);
+    }
 
     // Disconnect
     bleClient->disconnect();
