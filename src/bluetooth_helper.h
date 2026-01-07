@@ -236,10 +236,19 @@ int downloadPermitViaBluetooth(PermitData *data, const char *currentPermitNumber
     const char *plateNum = doc["plateNumber"] | "";
     const char *validFrom = doc["validFrom"] | "";
     const char *validTo = doc["validTo"] | "";
+    const char *barcodeVal = doc["barcodeValue"] | "";
+    const char *barcodeLbl = doc["barcodeLabel"] | "";
 
-    if (strlen(plateNum) == 0 || strlen(validFrom) == 0 || strlen(validTo) == 0)
+    if (strlen(plateNum) == 0 || strlen(validFrom) == 0 || strlen(validTo) == 0 ||
+        strlen(barcodeVal) == 0 || strlen(barcodeLbl) == 0)
     {
         Serial.println("ERROR: Incomplete permit data - missing required fields");
+        Serial.printf("  permitNumber: %s\n", strlen(newPermitNumber) > 0 ? "OK" : "MISSING");
+        Serial.printf("  plateNumber: %s\n", strlen(plateNum) > 0 ? "OK" : "MISSING");
+        Serial.printf("  validFrom: %s\n", strlen(validFrom) > 0 ? "OK" : "MISSING");
+        Serial.printf("  validTo: %s\n", strlen(validTo) > 0 ? "OK" : "MISSING");
+        Serial.printf("  barcodeValue: %s\n", strlen(barcodeVal) > 0 ? "OK" : "MISSING");
+        Serial.printf("  barcodeLabel: %s\n", strlen(barcodeLbl) > 0 ? "OK" : "MISSING");
         return 0;
     }
 
