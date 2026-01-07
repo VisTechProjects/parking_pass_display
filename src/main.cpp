@@ -164,44 +164,60 @@ bool loadPermitData(PermitData *data)
 }
 
 // Sync permit via Bluetooth
-void syncViaBluetooth(bool forceUpdate = false)
+// silent = true means don't update display unless permit changed (for boot sync)
+void syncViaBluetooth(bool forceUpdate = false, bool silent = false)
 {
   Serial.println("\n=== Bluetooth Sync ===");
+
+  // Determine sync type for phone notification
+  uint8_t syncType;
   if (forceUpdate)
   {
+    syncType = SYNC_TYPE_FORCE;
     Serial.println("FORCE UPDATE - Will update display regardless of permit number");
-    displayMessage("Force sync...", 1);
+    displayMessage("Force syncing...", 1);
+  }
+  else if (silent)
+  {
+    syncType = SYNC_TYPE_AUTO;
+    Serial.println("Silent sync mode (auto)");
   }
   else
   {
-    displayMessage("Scanning...", 1);
+    syncType = SYNC_TYPE_MANUAL;
+    Serial.println("Normal sync (manual)");
+    displayMessage("Syncing...", 1);
   }
 
   if (!scanForPhone())
   {
-    displayMessage("Phone not found", 1);
-    delay(2000);
-    // Redisplay current permit if we have one
-    if (strlen(currentPermit.permitNumber) > 0)
+    if (!silent)
     {
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
-                    currentPermit.validFrom, currentPermit.validTo,
-                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+      displayMessage("Phone not found", 1);
+      delay(2000);
+      // Redisplay current permit if we have one
+      if (strlen(currentPermit.permitNumber) > 0)
+      {
+        displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
+                      currentPermit.validFrom, currentPermit.validTo,
+                      currentPermit.barcodeValue, currentPermit.barcodeLabel);
+      }
+    }
+    else
+    {
+      Serial.println("Phone not found - keeping current display");
     }
     cleanupBluetooth();
     return;
   }
 
-  displayMessage("Connecting...", 1);
-
   PermitData newPermit;
-  int result = downloadPermitViaBluetooth(&newPermit, currentPermit.permitNumber);
+  int result = downloadPermitViaBluetooth(&newPermit, currentPermit.permitNumber, syncType);
 
   if (result == 1 || (result == 2 && forceUpdate))
   {
     // New permit received or force update
     Serial.println("Permit received!");
-    displayMessage("Updating...", 1);
 
     currentPermit = newPermit;
     savePermitData(&currentPermit);
@@ -214,27 +230,35 @@ void syncViaBluetooth(bool forceUpdate = false)
   }
   else if (result == 2)
   {
-    // Already up to date
+    // Already up to date - restore permit display if we showed "Syncing..."
     Serial.println("Already up to date");
-    displayMessage("Up to date", 1);
-    delay(1500);
-
-    displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
-                  currentPermit.validFrom, currentPermit.validTo,
-                  currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    if (!silent && strlen(currentPermit.permitNumber) > 0)
+    {
+      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
+                    currentPermit.validFrom, currentPermit.validTo,
+                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+    }
+    delay(100);  // Let BLE fully cleanup before continuing
   }
   else
   {
     // Error
     Serial.println("Sync failed");
-    displayMessage("Sync failed", 1);
-    delay(2000);
-
-    if (strlen(currentPermit.permitNumber) > 0)
+    if (!silent)
     {
-      displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
-                    currentPermit.validFrom, currentPermit.validTo,
-                    currentPermit.barcodeValue, currentPermit.barcodeLabel);
+      displayMessage("Sync failed", 1);
+      delay(2000);
+
+      if (strlen(currentPermit.permitNumber) > 0)
+      {
+        displayPermit(currentPermit.permitNumber, currentPermit.plateNumber,
+                      currentPermit.validFrom, currentPermit.validTo,
+                      currentPermit.barcodeValue, currentPermit.barcodeLabel);
+      }
+    }
+    else
+    {
+      Serial.println("Keeping current display");
     }
   }
 
@@ -245,7 +269,7 @@ void setup()
 {
   // Early pin setup before Serial
   pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, HIGH); // LED on immediately
+  digitalWrite(LED_PIN, LOW); // LED on immediately
 
   Serial.begin(115200);
 
@@ -286,14 +310,41 @@ void setup()
   }
 
   Serial.println("\nReady!");
-  Serial.println("Short press: Sync via Bluetooth");
-  Serial.println("Long press (3s): Force update display");
+  Serial.println("Short press (BOOT): Sync via Bluetooth");
+  Serial.println("Long press (3s): Force update");
 
-  digitalWrite(LED_PIN, LOW); // LED off when ready
+  // Auto-sync on boot (silent if we already have a permit displayed)
+  Serial.println("\nAuto-syncing on boot...");
+  bool silentSync = (strlen(currentPermit.permitNumber) > 0);
+  syncViaBluetooth(false, silentSync);
+
+  // Start BLE server to listen for commands from phone
+  startBleServer();
+}
+
+// Helper to perform sync (stops server, syncs, restarts server)
+void doSync(bool forceUpdate)
+{
+  stopBleServer();
+  syncViaBluetooth(forceUpdate);
+  startBleServer();
 }
 
 void loop()
 {
+  // Check for commands from phone
+  int cmd = getPendingCommand();
+  if (cmd == 1)
+  {
+    Serial.println("Sync command received from phone");
+    doSync(false);
+  }
+  else if (cmd == 2)
+  {
+    Serial.println("Force sync command received from phone");
+    doSync(true);
+  }
+
   // Check if button is pressed (LOW = pressed due to pullup)
   if (digitalRead(BUTTON_PIN) == LOW)
   {
@@ -310,7 +361,7 @@ void loop()
         {
           Serial.println("Long press detected - Force update!");
           longPressTriggered = true;
-          syncViaBluetooth(true); // Force update
+          doSync(true); // Force update
           break;
         }
         delay(10);
@@ -326,7 +377,7 @@ void loop()
       if (!longPressTriggered)
       {
         Serial.println("Short press detected - Normal sync");
-        syncViaBluetooth(false);
+        doSync(false);
       }
     }
   }
