@@ -30,6 +30,7 @@
 // Scan settings
 #define BLE_SCAN_TIME 10       // seconds to scan for phone
 #define BLE_CONNECT_TIMEOUT 10 // seconds to wait for connection
+#define BLE_MAX_RETRIES 2      // number of connection retries
 
 // Command received flag (checked in main loop)
 static volatile int pendingCommand = 0;  // 0=none, 1=sync, 2=force
@@ -231,12 +232,23 @@ int downloadPermitViaBluetooth(PermitData *data, const char *currentPermitNumber
         return 0;
     }
 
+    // Validate required fields exist
+    const char *plateNum = doc["plateNumber"] | "";
+    const char *validFrom = doc["validFrom"] | "";
+    const char *validTo = doc["validTo"] | "";
+
+    if (strlen(plateNum) == 0 || strlen(validFrom) == 0 || strlen(validTo) == 0)
+    {
+        Serial.println("ERROR: Incomplete permit data - missing required fields");
+        return 0;
+    }
+
     // Copy permit data - zero out struct first to ensure null termination
     memset(data, 0, sizeof(PermitData));
-    strncpy(data->permitNumber, doc["permitNumber"] | "", sizeof(data->permitNumber) - 1);
-    strncpy(data->plateNumber, doc["plateNumber"] | "", sizeof(data->plateNumber) - 1);
-    strncpy(data->validFrom, doc["validFrom"] | "", sizeof(data->validFrom) - 1);
-    strncpy(data->validTo, doc["validTo"] | "", sizeof(data->validTo) - 1);
+    strncpy(data->permitNumber, newPermitNumber, sizeof(data->permitNumber) - 1);
+    strncpy(data->plateNumber, plateNum, sizeof(data->plateNumber) - 1);
+    strncpy(data->validFrom, validFrom, sizeof(data->validFrom) - 1);
+    strncpy(data->validTo, validTo, sizeof(data->validTo) - 1);
     strncpy(data->barcodeValue, doc["barcodeValue"] | "", sizeof(data->barcodeValue) - 1);
     strncpy(data->barcodeLabel, doc["barcodeLabel"] | "", sizeof(data->barcodeLabel) - 1);
 

@@ -212,7 +212,22 @@ void syncViaBluetooth(bool forceUpdate = false, bool silent = false)
   }
 
   PermitData newPermit;
-  int result = downloadPermitViaBluetooth(&newPermit, currentPermit.permitNumber, syncType);
+  int result = 0;
+
+  // Retry logic for connection failures
+  for (int attempt = 1; attempt <= BLE_MAX_RETRIES; attempt++)
+  {
+    result = downloadPermitViaBluetooth(&newPermit, currentPermit.permitNumber, syncType);
+    if (result != 0)
+    {
+      break; // Success or already up to date
+    }
+    if (attempt < BLE_MAX_RETRIES)
+    {
+      Serial.printf("Retry %d/%d...\n", attempt, BLE_MAX_RETRIES);
+      delay(500);
+    }
+  }
 
   if (result == 1 || (result == 2 && forceUpdate))
   {
