@@ -4,7 +4,7 @@
 ![Display](https://img.shields.io/badge/display-E--Ink%20296x128-green)
 ![BLE](https://img.shields.io/badge/BLE-Bluetooth%20LE-blue)
 
-ESP32 e-ink display that shows your Toronto temporary parking permit. Syncs wirelessly via Bluetooth from the [ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync) Android app.
+ESP32 e-ink display that shows your Toronto temporary parking permit. Syncs wirelessly via Bluetooth from the [parking-permit-android](https://github.com/VisTechProjects/parking-permit-android) app.
 
 ## Hardware
 
@@ -14,7 +14,7 @@ ESP32 e-ink display that shows your Toronto temporary parking permit. Syncs wire
 
 ## How It Works
 
-1. Android app ([ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync)) purchases/fetches permit automatically
+1. Android app ([parking-permit-android](https://github.com/VisTechProjects/parking-permit-android)) purchases/fetches permit automatically
 2. Press button on ESP32 or trigger from app
 3. ESP32 connects to phone via BLE and downloads permit data
 4. Display updates with permit info and barcode
@@ -39,7 +39,7 @@ pio run -e vision_e290 --target upload
 
 ### 2. Install Android App
 
-Install [ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync) on your phone.
+Install [parking-permit-android](https://github.com/VisTechProjects/parking-permit-android) on your phone.
 
 ### 3. Sync
 
