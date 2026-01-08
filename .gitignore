@@ -3,6 +3,7 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+/.claude/
 
 # WiFi credentials (use wifi_config.h.example as template)
 src/wifi_config.h
@@ -11,3 +12,4 @@ src/wifi_config.h
 *.pdf
 *.png
 *.bmp
+*.py
