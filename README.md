@@ -73,6 +73,7 @@ ESP32 scans for the Android app's BLE advertisement, connects, and reads permit 
 
 - [parking-permit-buyer](https://github.com/VisTechProjects/parking-permit-buyer) - Python script to purchase permits
 - [parking-permit-android](https://github.com/VisTechProjects/parking-permit-android) - Android companion app
+- [Parking permit website](https://ilovekitty.ca/parking/) - Web dashboard
 
 ## Notes
 
