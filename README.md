@@ -69,6 +69,11 @@ ESP32 scans for the Android app's BLE advertisement, connects, and reads permit 
 - `wifi-only` - Original WiFi version (pulls from GitHub)
 - `permit` - Permit JSON data
 
+## Related Projects
+
+- [parking-permit-buyer](https://github.com/VisTechProjects/parking-permit-buyer) - Python script to purchase permits
+- [parking-permit-android](https://github.com/VisTechProjects/parking-permit-android) - Android companion app
+
 ## Notes
 
 - Permit data persists in flash memory
