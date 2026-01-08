@@ -2,89 +2,74 @@
 
 ![Platform](https://img.shields.io/badge/platform-ESP32-blue)
 ![Display](https://img.shields.io/badge/display-E--Ink%20296x128-green)
-![ArduinoJson](https://img.shields.io/badge/ArduinoJson-v7%2B-orange)
-![WiFi](https://img.shields.io/badge/WiFi-Multi--Network-brightgreen)
+![BLE](https://img.shields.io/badge/BLE-Bluetooth%20LE-blue)
 
-ESP32 e-ink display that automatically updates your Toronto temporary parking permit from GitHub.
+ESP32 e-ink display that shows your Toronto temporary parking permit. Syncs wirelessly via Bluetooth from the [ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync) Android app.
 
 ## Hardware
 
-- ESP32 with e-ink display (296x128) [Heltec E290 e-ink display](https://heltec.org/project/vision-master-e290/)
+- [Heltec Vision Master E290](https://heltec.org/project/vision-master-e290/) (ESP32-S3 + 2.9" e-ink)
 - Button on GPIO 21
+- LED on GPIO 45
 
-## Setup
+## How It Works
 
-### 1. Configure WiFi
-
-Edit `wifi_config.h`:
-```cpp
-const char* WIFI_SSID_1 = "YourWiFi";
-const char* WIFI_PASS_1 = "password";
-```
-
-### 2. GitHub Setup
-
-Create `permit.json` on `permit` branch:
-```json
-{
-  "permitNumber": "T6146330",
-  "plateNumber": "CSEB123",
-  "validFrom": "Oct 25, 2025: 12:00",
-  "validTo": "Nov 01, 2025: 11:59",
-  "barcodeValue": "6146330",
-  "barcodeLabel": "00435" // diffrent form barcode value
-}
-```
-
-Update GitHub URL in `wifi_config.h`:
-```cpp
-const char* SERVER_URL = "https://raw.githubusercontent.com/YOUR_USER/parking_pass_display/permit/permit.json";
-```
-
-### 3. Upload Code
-
-Install libraries:
-- Heltec E-Ink Modules
-- ArduinoJson v7+
-
-Upload `main.cpp` to ESP32.
+1. Android app ([ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync)) purchases/fetches permit automatically
+2. Press button on ESP32 or trigger from app
+3. ESP32 connects to phone via BLE and downloads permit data
+4. Display updates with permit info and barcode
 
 ## Usage
 
-**Short press** - Check for updates (only downloads if permit number changed)
-**Long press (3+ sec)** - Force update (downloads all data, bypasses CDN cache)
+| Action | Result |
+|--------|--------|
+| **Short press** | Sync via BLE (only updates if permit changed) |
+| **Long press (3s)** | Force update display |
+| **From app** | Tap sync button to push to display |
 
-Device auto-checks for updates on boot.
+Device auto-syncs on boot if phone is nearby.
 
-### Why Force Update?
+## Setup
 
-Use force update when you:
-- Changed permit details (dates, plate) but kept same permit number
-- Need to bypass GitHub's CDN cache (updates immediately, no 5-10 min wait)
-
-## Update Permit (Python)
+### 1. Upload Firmware
 
 ```bash
-pip install pdfplumber PyPDF2 requests
-export GITHUB_TOKEN="your_token"
-python parse_parking_permit.py
+pio run -e vision_e290 --target upload
 ```
 
-Parses PDF and pushes to GitHub automatically.
+### 2. Install Android App
+
+Install [ParkingPermitSync](https://github.com/VisTechProjects/ParkingPermitSync) on your phone.
+
+### 3. Pair
+
+1. Open app on phone
+2. Press button on ESP32
+3. They'll find each other via BLE
+
+## BLE Protocol
+
+- Service UUID: `12345678-1234-5678-1234-56789abcdef0`
+- Permit Characteristic: `12345678-1234-5678-1234-56789abcdef1`
+
+ESP32 scans for the Android app's BLE advertisement, connects, and reads permit JSON.
 
 ## Files
 
-- `main.cpp` - Main code
-- `wifi_helper.h` - WiFi and download
-- `wifi_config.h` - WiFi settings
-- `permit_config.h` - Display layout
-- `Code39Generator.h` - Barcode
-- `parse_parking_permit.py` - PDF parser
+- `src/main.cpp` - Main firmware
+- `src/bluetooth_helper.h` - BLE client/server
+- `src/permit_config.h` - Display layout constants
+- `src/Code39Generator.h` - Barcode rendering
+
+## Branches
+
+- `main` / `dev` - BLE version (current)
+- `wifi-only` - Original WiFi version (pulls from GitHub)
+- `permit` - Permit JSON data
 
 ## Notes
 
-- Permit data stored in flash memory (persists after power loss)
-- WiFi scan-first optimization (3-5 sec connection)
+- Permit data persists in flash memory
 - E-ink retains image when powered off
-- Force update adds cache-busting parameter to bypass GitHub CDN
-- Multiple WiFi support with automatic fallback
+- ~0.35% battery/day on Android for background BLE
+- Display can be flipped 180° via app setting
